@@ -5,7 +5,9 @@ call() { curl -s -H "X-Token: $TOKEN" -G "$@"; echo; }
 case "$1" in
   open) call --data-urlencode "url=$2" $B/open ;;
   text) call --data-urlencode "max=${2:-4000}" $B/text ;;
-  elements) call $B/elements ;;
+  elements) call --data-urlencode "scope=$2" --data-urlencode "match=$3" $B/elements ;;
+  inspect) call --data-urlencode "id=$2" $B/inspect ;;
+  outline) call $B/outline ;;
   click) call --data-urlencode "id=$2" $B/click ;;
   type) call --data-urlencode "id=$2" --data-urlencode "text=$3" $B/type ;;
   press) call --data-urlencode "key=${2:-Enter}" $B/press ;;
@@ -13,10 +15,14 @@ case "$1" in
   back) call $B/back ;;
   forward) call $B/forward ;;
   reload) call $B/reload ;;
+  tabs) call $B/tabs ;;
+  newtab) call --data-urlencode "url=$2" $B/newtab ;;
+  tab) call --data-urlencode "n=$2" $B/tab ;;
+  closetab) call $B/closetab ;;
   wait) call --data-urlencode "seconds=${2:-2}" $B/wait ;;
   waitfor) call --data-urlencode "selector=$2" --data-urlencode "seconds=${3:-10}" $B/wait ;;
   downloads) call $B/downloads ;;
   screenshot) OUT="${2:-$HOME/shot.jpg}"; curl -s -H "X-Token: $TOKEN" -o "$OUT" $B/screenshot; echo "saved $OUT" ;;
   url) call $B/url ;;
-  *) echo "usage: browse open <url> | text [max] | elements | click <n> | type <n> <text> | press [key] | scroll [up|down] | back | forward | reload | wait [sec] | waitfor <css> [sec] | downloads | screenshot [file] | url" ;;
+  *) echo "usage: browse open <url> | text [max] | elements [css-scope] [text-filter] | inspect <n> | outline | click <n> | type <n> <text> | press [key] | scroll [up|down] | back | forward | reload | tabs | newtab <url> | tab <n> | closetab | wait [sec] | waitfor <css> [sec] | downloads | screenshot [file] | url" ;;
 esac

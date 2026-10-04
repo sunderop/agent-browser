@@ -10,8 +10,8 @@ android {
         applicationId = "com.agentbrowser"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
     }
     // Same signing key on every build, so new APKs install over the old app.
     signingConfigs {
