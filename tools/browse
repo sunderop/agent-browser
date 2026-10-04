@@ -1,0 +1,22 @@
+#!/data/data/com.termux/files/usr/bin/bash
+TOKEN=$(cat ~/.browse_token)
+B=http://127.0.0.1:8765
+call() { curl -s -H "X-Token: $TOKEN" -G "$@"; echo; }
+case "$1" in
+  open) call --data-urlencode "url=$2" $B/open ;;
+  text) call --data-urlencode "max=${2:-4000}" $B/text ;;
+  elements) call $B/elements ;;
+  click) call --data-urlencode "id=$2" $B/click ;;
+  type) call --data-urlencode "id=$2" --data-urlencode "text=$3" $B/type ;;
+  press) call --data-urlencode "key=${2:-Enter}" $B/press ;;
+  scroll) call --data-urlencode "dir=${2:-down}" $B/scroll ;;
+  back) call $B/back ;;
+  forward) call $B/forward ;;
+  reload) call $B/reload ;;
+  wait) call --data-urlencode "seconds=${2:-2}" $B/wait ;;
+  waitfor) call --data-urlencode "selector=$2" --data-urlencode "seconds=${3:-10}" $B/wait ;;
+  downloads) call $B/downloads ;;
+  screenshot) OUT="${2:-$HOME/shot.jpg}"; curl -s -H "X-Token: $TOKEN" -o "$OUT" $B/screenshot; echo "saved $OUT" ;;
+  url) call $B/url ;;
+  *) echo "usage: browse open <url> | text [max] | elements | click <n> | type <n> <text> | press [key] | scroll [up|down] | back | forward | reload | wait [sec] | waitfor <css> [sec] | downloads | screenshot [file] | url" ;;
+esac

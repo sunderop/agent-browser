@@ -23,7 +23,8 @@ object Scripts {
   var t=(e.getAttribute('aria-label')||e.innerText||e.placeholder||e.value||e.title||e.alt||e.name||'').replace(/\s+/g,' ').trim().slice(0,60);
   var k=e.tagName.toLowerCase();
   if(k==='input')k='input:'+(e.type||'text');
-  out.push(n+'. ['+k+'] '+t);
+  var h=k==='a'?(' -> '+(e.getAttribute('href')||'').slice(0,70)):'';
+  out.push(n+'. ['+k+'] '+t+h);
  });
  return out.length?out.join('\n'):'no interactive elements found';
 })()
