@@ -30,19 +30,24 @@ class BrowserServer(
                     val max = arg("max").toIntOrNull() ?: 20000
                     app.js("(document.body ? document.body.innerText : '')").take(max)
                 }
-                "/click" -> app.js(
-                    "(function(){var e=document.querySelector(${q(arg("selector"))});" +
-                    "if(!e)return 'not found';e.click();return 'ok'})()")
-                "/type" -> app.js(
-                    "(function(){var e=document.querySelector(${q(arg("selector"))});" +
-                    "if(!e)return 'not found';e.focus();" +
-                    "var P=e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;" +
-                    "var d=Object.getOwnPropertyDescriptor(P,'value');" +
-                    "if(d&&d.set){d.set.call(e,${q(arg("text"))})}else{e.value=${q(arg("text"))}}" +
-                    "e.dispatchEvent(new Event('input',{bubbles:true}));" +
-                    "e.dispatchEvent(new Event('change',{bubbles:true}));return 'ok'})()")
+                "/elements" -> app.js(Scripts.ELEMENTS)
+                "/click" -> {
+                    val id = arg("id").toIntOrNull()
+                    if (id != null) app.js(Scripts.click(id))
+                    else app.js(
+                        "(function(){var e=document.querySelector(${q(arg("selector"))});" +
+                        "if(!e)return 'not found';e.click();return 'ok'})()")
+                }
+                "/type" -> {
+                    val id = arg("id").toIntOrNull()
+                    if (id != null) app.js(Scripts.type(id, arg("text")))
+                    else "error: pass id=<number from /elements>"
+                }
+                "/press" -> app.js(Scripts.press(arg("key").ifEmpty { "Enter" }))
+                "/scroll" -> app.js(Scripts.scroll(arg("dir") != "up"))
+                "/back" -> app.js("(function(){history.back();return 'back'})()")
                 "/eval" -> app.js(arg("js"))
-                else -> "unknown endpoint. use: /open /url /text /click /type /eval"
+                else -> "unknown endpoint. use: /open /url /text /elements /click /type /press /scroll /back /eval"
             }
         } catch (e: Exception) {
             "error: ${e.message}"
