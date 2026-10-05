@@ -561,8 +561,19 @@ class MainActivity : Activity() {
         var code = "SCREENSHOT_FAILED"
         runOnUiThread {
             try {
-                val w = web.width
-                val h = web.height
+                var w = web.width
+                var h = web.height
+                if (w <= 0 || h <= 0) {
+                    // Not laid out yet (a tab that was just switched to, or the app is in the background)
+                    w = holder.width
+                    h = holder.height
+                    if (w > 0 && h > 0) {
+                        web.measure(
+                            View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+                        web.layout(0, 0, w, h)
+                    }
+                }
                 if (w > 0 && h > 0) {
                     val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     web.draw(Canvas(bmp))

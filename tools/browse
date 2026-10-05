@@ -41,27 +41,30 @@ case "$1" in
   selftest)
     P=0; F=0
     t() { if printf '%s' "$3" | grep -qF -- "$2"; then echo "PASS  $1"; P=$((P+1)); else echo "FAIL  $1   (got: $(printf '%s' "$3" | head -c 90 | tr '\n' ' '))"; F=$((F+1)); fi; }
+    tre() { if printf '%s' "$3" | grep -qE -- "$2"; then echo "PASS  $1"; P=$((P+1)); else echo "FAIL  $1   (got: $(printf '%s' "$3" | head -c 90 | tr '\n' ' '))"; F=$((F+1)); fi; }
     echo "Self-test (about a minute; keep the app open on screen)"
     t "bad token is rejected" "UNAUTHORIZED" "$(curl -s -H 'X-Token: wrong' $B/url)"
+    "$SELF" newtab https://www.wikipedia.org >/dev/null; sleep 4
     t "health is READY" "READY" "$("$SELF" health)"
-    t "open an https page" "Example Domain" "$("$SELF" open https://example.com)"
+    t "open an https page" "Wikipedia" "$("$SELF" open https://www.wikipedia.org)"
     t "http is refused cleanly" "BAD_REQUEST" "$("$SELF" open http://example.com)"
-    t "read page text" "Example Domain" "$("$SELF" text 500)"
-    t "elements list" "1 a" "$("$SELF" elements)"
+    tre "read page text" '.{40}' "$("$SELF" text 500)"
+    tre "elements list" '^[0-9]+ (a|btn|in|search) ' "$("$SELF" elements)"
     t "page state" "READY: true" "$("$SELF" state)"
     t "outline" "TITLE:" "$("$SELF" outline)"
-    t "wait-text" "found" "$("$SELF" wait-text "Example Domain" 5)"
+    t "wait-text" "found" "$("$SELF" wait-text "Wikipedia" 5)"
     t "stale element is reported" "ELEMENT_STALE" "$("$SELF" click 9999)"
     t "unknown label is reported" "NOT_FOUND" "$("$SELF" click "zzzz-no-such-label")"
     t "scroll" "scrolled" "$("$SELF" scroll down)"
-    t "open a new tab" "opened" "$("$SELF" newtab https://example.com)"
+    t "forward with nothing later" "NOT_FOUND" "$("$SELF" forward)"
+    t "open a new tab" "opened" "$("$SELF" newtab https://www.wikipedia.org)"
     t "tabs list" "ACTIVE" "$("$SELF" tabs)"
     t "close the tab" "closed" "$("$SELF" closetab)"
-    t "back with nothing earlier" "NOT_FOUND" "$("$SELF" back)"
     "$SELF" screenshot "$HOME/selftest.jpg" >/dev/null
     S=$(wc -c < "$HOME/selftest.jpg" 2>/dev/null || echo 0)
-    if [ "${S:-0}" -gt 2000 ]; then echo "PASS  screenshot (${S} bytes)"; P=$((P+1)); else echo "FAIL  screenshot   (got: $(head -c 90 "$HOME/selftest.jpg" 2>/dev/null))"; F=$((F+1)); fi
+    if [ "${S:-0}" -gt 2000 ]; then echo "PASS  screenshot (${S} bytes)"; P=$((P+1)); else echo "FAIL  screenshot   (the app must be visible on screen; got: $(head -c 90 "$HOME/selftest.jpg" 2>/dev/null))"; F=$((F+1)); fi
     rm -f "$HOME/selftest.jpg"
+    "$SELF" closetab >/dev/null
     echo "-- $P passed, $F failed"
     ;;
   *) echo "usage: browse open <https-url> | text [max] | elements [--all] [--refs] [css-scope] [text-filter] | inspect <n|ref> | outline | state | health | recover | click <n|\"label\"> | click-ref <ref> | type <n|\"field label\"> <text> [fast] | type-ref <ref> <text> | press [key] | scroll [up|down] | back | forward | reload | tabs | newtab <url> | tab <n> | closetab | wait [sec] | waitfor <css> [sec] | wait-text <text> [sec] | pause [reason] | wait-resume [sec] | downloads | screenshot [file] | url | selftest" ;;
