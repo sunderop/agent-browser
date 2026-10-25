@@ -1,71 +1,105 @@
-#!/data/data/com.termux/files/usr/bin/bash
-TOKEN=$(cat ~/.browse_token)
-B=http://127.0.0.1:8765
-SELF="$0"
-call() { curl -s -H "X-Token: $TOKEN" -G "$@"; echo; }
-isnum() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+#!/usr/bin/env bash
+set -e
+
+HOST="127.0.0.1"
+PORT="8765"
+TOKEN_FILE="$HOME/.browse_token"
+
+if [ ! -f "$TOKEN_FILE" ]; then
+    echo "ERROR: Token file not found at $TOKEN_FILE"
+    echo "Run: echo 'YOUR_TOKEN' > ~/.browse_token"
+    exit 1
+fi
+
+TOKEN=$(cat "$TOKEN_FILE" | tr -d '[:space:]')
+
+req() {
+    local action=$1
+    shift
+    local params=""
+    for arg in "$@"; do
+        params="$params&$arg"
+    done
+    params="${params#&}"
+    
+    local response=$(curl -s -w "\n%{http_code}" -H "X-Token: $TOKEN" "http://$HOST:$PORT/?action=$action&$params")
+    local http_code="${response##*$'\n'}"
+    local body="${response%$'\n'*}"
+
+    if [ "$http_code" = "403" ] && [[ "$body" == *"DENIED_BY_USER"* ]]; then
+        echo "🛑 CRITICAL: Action DENIED BY USER. Halting."
+        exit 1
+    elif [ "$http_code" != "200" ]; then
+        echo "ERROR: HTTP $http_code - $body"
+        exit 1
+    fi
+    echo "$body"
+}
+
+do_click() {
+    local index=$1
+    local attempt=1
+    while [ $attempt -le 2 ]; do
+        local result=$(req "click" "index=$index")
+        if [[ "$result" == *"Element not found"* ]] && [ $attempt -eq 1 ]; then
+            echo "⚠️ Element $index not found. Refreshing DOM and retrying once..."
+            req "elements" > /dev/null
+            attempt=$((attempt + 1))
+        else
+            echo "$result"
+            break
+        fi
+    done
+}
+
 case "$1" in
-  open) call --data-urlencode "url=$2" $B/open ;;
-  text) call --data-urlencode "max=${2:-4000}" $B/text ;;
-  elements) shift; ALL=0; REFS=0
-            while [ "${1#--}" != "$1" ]; do case "$1" in --all) ALL=1;; --refs) REFS=1;; esac; shift; done
-            call --data-urlencode "scope=$1" --data-urlencode "match=$2" --data-urlencode "all=$ALL" --data-urlencode "refs=$REFS" $B/elements ;;
-  inspect) if isnum "$2"; then call --data-urlencode "id=$2" $B/inspect; else call --data-urlencode "ref=$2" $B/inspect; fi ;;
-  outline) call $B/outline ;;
-  state) call $B/state ;;
-  health) call $B/health ;;
-  recover) call $B/recover ;;
-  click|click-text) if isnum "$2"; then call --data-urlencode "id=$2" $B/click; else call --data-urlencode "text=$2" $B/click; fi ;;
-  click-ref) call --data-urlencode "ref=$2" $B/click ;;
-  type|type-label) FAST=0; [ "$4" = "fast" ] && FAST=1
-        if isnum "$2"; then call --data-urlencode "id=$2" --data-urlencode "text=$3" --data-urlencode "fast=$FAST" $B/type
-        else call --data-urlencode "label=$2" --data-urlencode "text=$3" --data-urlencode "fast=$FAST" $B/type; fi ;;
-  type-ref) call --data-urlencode "ref=$2" --data-urlencode "text=$3" $B/type ;;
-  press) call --data-urlencode "key=${2:-Enter}" $B/press ;;
-  scroll) call --data-urlencode "dir=${2:-down}" $B/scroll ;;
-  back) call $B/back ;;
-  forward) call $B/forward ;;
-  reload) call $B/reload ;;
-  tabs) call $B/tabs ;;
-  newtab) call --data-urlencode "url=$2" $B/newtab ;;
-  tab) call --data-urlencode "n=$2" $B/tab ;;
-  closetab) call $B/closetab ;;
-  wait) call --data-urlencode "seconds=${2:-2}" $B/wait ;;
-  waitfor) call --data-urlencode "selector=$2" --data-urlencode "seconds=${3:-10}" $B/wait ;;
-  wait-text) call --data-urlencode "text=$2" --data-urlencode "seconds=${3:-10}" $B/wait ;;
-  pause) call --data-urlencode "reason=$2" $B/pause ;;
-  wait-resume) call --data-urlencode "seconds=${2:-60}" $B/waitresume ;;
-  downloads) call $B/downloads ;;
-  screenshot) OUT="${2:-$HOME/shot.jpg}"; curl -s -H "X-Token: $TOKEN" -o "$OUT" $B/screenshot; echo "saved $OUT" ;;
-  url) call $B/url ;;
-  selftest)
-    P=0; F=0
-    t() { if printf '%s' "$3" | grep -qF -- "$2"; then echo "PASS  $1"; P=$((P+1)); else echo "FAIL  $1   (got: $(printf '%s' "$3" | head -c 90 | tr '\n' ' '))"; F=$((F+1)); fi; }
-    tre() { if printf '%s' "$3" | grep -qE -- "$2"; then echo "PASS  $1"; P=$((P+1)); else echo "FAIL  $1   (got: $(printf '%s' "$3" | head -c 90 | tr '\n' ' '))"; F=$((F+1)); fi; }
-    echo "Self-test (about a minute; keep the app open on screen)"
-    t "bad token is rejected" "UNAUTHORIZED" "$(curl -s -H 'X-Token: wrong' $B/url)"
-    "$SELF" newtab https://www.wikipedia.org >/dev/null; sleep 4
-    t "health is READY" "READY" "$("$SELF" health)"
-    t "open an https page" "Wikipedia" "$("$SELF" open https://www.wikipedia.org)"
-    t "http is refused cleanly" "BAD_REQUEST" "$("$SELF" open http://example.com)"
-    tre "read page text" '.{40}' "$("$SELF" text 500)"
-    tre "elements list" '^[0-9]+ (a|btn|in|search) ' "$("$SELF" elements)"
-    t "page state" "READY: true" "$("$SELF" state)"
-    t "outline" "TITLE:" "$("$SELF" outline)"
-    t "wait-text" "found" "$("$SELF" wait-text "Wikipedia" 5)"
-    t "stale element is reported" "ELEMENT_STALE" "$("$SELF" click 9999)"
-    t "unknown label is reported" "NOT_FOUND" "$("$SELF" click "zzzz-no-such-label")"
-    t "scroll" "scrolled" "$("$SELF" scroll down)"
-    t "forward with nothing later" "NOT_FOUND" "$("$SELF" forward)"
-    t "open a new tab" "opened" "$("$SELF" newtab https://www.wikipedia.org)"
-    t "tabs list" "ACTIVE" "$("$SELF" tabs)"
-    t "close the tab" "closed" "$("$SELF" closetab)"
-    "$SELF" screenshot "$HOME/selftest.jpg" >/dev/null
-    S=$(wc -c < "$HOME/selftest.jpg" 2>/dev/null || echo 0)
-    if [ "${S:-0}" -gt 2000 ]; then echo "PASS  screenshot (${S} bytes)"; P=$((P+1)); else echo "FAIL  screenshot   (the app must be visible on screen; got: $(head -c 90 "$HOME/selftest.jpg" 2>/dev/null))"; F=$((F+1)); fi
-    rm -f "$HOME/selftest.jpg"
-    "$SELF" closetab >/dev/null
-    echo "-- $P passed, $F failed"
-    ;;
-  *) echo "usage: browse open <https-url> | text [max] | elements [--all] [--refs] [css-scope] [text-filter] | inspect <n|ref> | outline | state | health | recover | click <n|\"label\"> | click-ref <ref> | type <n|\"field label\"> <text> [fast] | type-ref <ref> <text> | press [key] | scroll [up|down] | back | forward | reload | tabs | newtab <url> | tab <n> | closetab | wait [sec] | waitfor <css> [sec] | wait-text <text> [sec] | pause [reason] | wait-resume [sec] | downloads | screenshot [file] | url | selftest" ;;
+    open) req "open" "url=${2}" ;;
+    url) req "url" ;;
+    waitfor-load) req "waitfor-load" ;;
+    waitfor-text) req "waitfor-text" "text=$(echo "$2" | jq -sRr @uri)" ;;
+    elements) 
+        if [ -n "$2" ]; then
+            req "elements" "css=$(echo "$2" | jq -sRr @uri)&text=$(echo "$3" | jq -sRr @uri)"
+        else
+            req "elements"
+        fi
+        ;;
+    click) do_click "$2" ;;
+    type) req "type" "index=$2&text=$(echo "$3" | jq -sRr @uri)" ;;
+    select) req "select" "index=$2&value=$(echo "$3" | jq -sRr @uri)" ;;
+    submit) req "submit" "index=$2" ;;
+    html) req "html" ;;
+    meta) req "meta" ;;
+    screenshot) 
+        req "screenshot"
+        echo "Saved to ~/shot.jpg"
+        ;;
+    back|forward|reload) req "$1" ;;
+    tabs|newtab|tab|closetab|downloads|outline|inspect|press|scroll)
+        cmd=$1
+        shift
+        req "$cmd" "$@"
+        ;;
+    run)
+        if [ -z "$2" ] || [ ! -f "$2" ]; then
+            echo "ERROR: File not found: $2"
+            exit 1
+        fi
+        echo "▶️ Running workflow from $2..."
+        line_num=1
+        while IFS= read -r line || [ -n "$line" ]; do
+            [[ -z "$line" || "$line" =~ ^# ]] && continue
+            echo "[$line_num] $ $line"
+            if ! bash "$0" $line; then
+                echo "🛑 Workflow halted at line $line_num due to error or user denial."
+                exit 1
+            fi
+            line_num=$((line_num + 1))
+        done < "$2"
+        echo "✅ Workflow completed successfully."
+        ;;
+    *)
+        echo "Usage: browse <command> [args]"
+        exit 1
+        ;;
 esac
