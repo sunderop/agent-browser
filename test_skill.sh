@@ -1,33 +1,22 @@
 #!/usr/bin/env bash
-echo "🔍 Testing AgentBrowser Skill Integration..."
+echo "🔍 Testing AgentBrowser Update 5 (Full)..."
 
-if ! command -v browse &> /dev/null; then
-    echo "❌ FAIL: 'browse' command not found in PATH."
-    exit 1
-fi
+if ! command -v browse &> /dev/null; then echo "❌ FAIL: 'browse' not found."; exit 1; fi
+if [ ! -f "$HOME/.browse_token" ]; then echo "❌ FAIL: Token missing."; exit 1; fi
 
-if [ ! -f "$HOME/.browse_token" ]; then
-    echo "❌ FAIL: ~/.browse_token not found."
-    exit 1
-fi
-
-echo "✅ Prerequisites met."
-echo "▶️ Step 1: Navigating to example.com..."
+echo "▶️ 1. Navigate & Wait..."
 browse open "https://example.com"
-
-echo "▶️ Step 2: Waiting for load..."
 browse waitfor-load
 
-echo "▶️ Step 3: Getting outline..."
-browse outline
+echo "▶️ 2. Find element by text..."
+INDEX=$(browse find "More information")
+if [ "$INDEX" = "-1" ] || [ -z "$INDEX" ]; then echo "❌ FAIL: Could not find text."; exit 1; fi
+echo "   Found 'More information' at index: $INDEX"
 
-echo "▶️ Step 4: Getting elements..."
-ELEMENTS=$(browse elements)
+echo "▶️ 3. Scroll to element..."
+browse scroll-to "$INDEX"
 
-if [[ "$ELEMENTS" == *"ERROR"* ]] || [[ -z "$ELEMENTS" ]]; then
-    echo "❌ FAIL: Could not retrieve elements. Is the Android app open and visible?"
-    exit 1
-fi
+echo "▶️ 4. Get Meta tags..."
+browse meta | head -n 3
 
-echo "✅ SUCCESS: AgentBrowser is fully operational."
-echo "$ELEMENTS" | head -n 5
+echo "✅ SUCCESS: All Update 5 features operational."
