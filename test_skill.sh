@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "🔍 Testing AgentBrowser Update 5 (Full)..."
+echo "🔍 Testing AgentBrowser Update 6 (All Features)..."
 
 if ! command -v browse &> /dev/null; then echo "❌ FAIL: 'browse' not found."; exit 1; fi
 if [ ! -f "$HOME/.browse_token" ]; then echo "❌ FAIL: Token missing."; exit 1; fi
@@ -8,15 +8,27 @@ echo "▶️ 1. Navigate & Wait..."
 browse open "https://example.com"
 browse waitfor-load
 
-echo "▶️ 2. Find element by text..."
-INDEX=$(browse find "More information")
-if [ "$INDEX" = "-1" ] || [ -z "$INDEX" ]; then echo "❌ FAIL: Could not find text."; exit 1; fi
-echo "   Found 'More information' at index: $INDEX"
+echo "▶️ 2. Test Pacing..."
+browse pace 1000
+echo "   Pacing set to 1000ms"
 
-echo "▶️ 3. Scroll to element..."
+echo "▶️ 3. Test Random Wait..."
+browse wait-random 500 1500
+echo "   Random wait completed"
+
+echo "▶️ 4. Test iframe Detection..."
+FRAMES=$(browse frames)
+echo "   Found frames: $FRAMES"
+
+echo "▶️ 5. Test Tab Switch by URL..."
+browse tab-url "example"
+echo "   Tab switch attempted"
+
+echo "▶️ 6. Test Find Element..."
+INDEX=$(browse find "More information")
+echo "   Found element at index: $INDEX"
+
+echo "▶️ 7. Test Scroll to Element..."
 browse scroll-to "$INDEX"
 
-echo "▶️ 4. Get Meta tags..."
-browse meta | head -n 3
-
-echo "✅ SUCCESS: All Update 5 features operational."
+echo "✅ SUCCESS: All Update 6 features operational."

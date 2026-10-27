@@ -46,27 +46,62 @@ do_click() {
 }
 
 case "$1" in
+    # Navigation & State
     open) req "open" "url=${2}" ;;
     url) req "url" ;;
+    back|forward|reload) req "$1" ;;
     waitfor-load) req "waitfor-load" ;;
     waitfor-text) req "waitfor-text" "text=$(echo "$2" | jq -sRr @uri)" ;;
     waitfor-gone) req "waitfor-gone" "css=$(echo "$2" | jq -sRr @uri)" ;;
+    
+    # Discovery
     elements) 
         if [ -n "$2" ]; then req "elements" "css=$(echo "$2" | jq -sRr @uri)&text=$(echo "$3" | jq -sRr @uri)"
         else req "elements"; fi ;;
     find) req "find" "text=$(echo "$2" | jq -sRr @uri)" ;;
+    outline) req "outline" ;;
+    inspect) req "inspect" "index=$2" ;;
+    
+    # Interaction
     click) do_click "$2" ;;
     type) req "type" "index=$2&text=$(echo "$3" | jq -sRr @uri)" ;;
     select) req "select" "index=$2&value=$(echo "$3" | jq -sRr @uri)" ;;
     submit) req "submit" "index=$2" ;;
+    press) req "press" "key=${2:-Enter}" ;;
+    scroll) req "scroll" "direction=$2" ;;
     scroll-to) req "scroll-to" "index=$2" ;;
+    
+    # File Operations (NEW)
+    upload) req "upload" "index=$2&path=$(echo "$3" | jq -sRr @uri)" ;;
+    downloads) req "downloads" ;;
+    download) req "download" "url=$(echo "$2" | jq -sRr @uri)" ;;
+    download-status) req "download-status" "id=$2" ;;
+    download-wait) req "download-wait" "id=$2" ;;
+    
+    # iframe Support (NEW)
+    frames) req "frames" ;;
+    frame) req "frame" "index=$2" ;;
+    frame-main) req "frame-main" ;;
+    
+    # Tab Management
+    tabs) req "tabs" ;;
+    newtab) req "newtab" "url=${2}" ;;
+    tab) req "tab" "index=$2" ;;
+    closetab) req "closetab" ;;
+    tab-url) req "tab-url" "url=$(echo "$2" | jq -sRr @uri)" ;;
+    tab-title) req "tab-title" "title=$(echo "$2" | jq -sRr @uri)" ;;
+    
+    # Advanced
     eval) req "eval" "js=$(echo "$2" | jq -sRr @uri)" ;;
     html) req "html" ;;
     meta) req "meta" ;;
     screenshot) req "screenshot"; echo "Saved to ~/shot.jpg" ;;
-    back|forward|reload) req "$1" ;;
-    tabs|newtab|tab|closetab|downloads|outline|inspect|press|scroll)
-        cmd=$1; shift; req "$cmd" "$@" ;;
+    
+    # Pacing (NEW)
+    pace) req "pace" "ms=$2" ;;
+    wait-random) req "wait-random" "min=$2&max=$3" ;;
+    
+    # Automation
     run)
         if [ -z "$2" ] || [ ! -f "$2" ]; then echo "ERROR: File not found: $2"; exit 1; fi
         echo "▶️ Running workflow from $2..."
@@ -80,5 +115,6 @@ case "$1" in
             line_num=$((line_num + 1))
         done < "$2"
         echo "✅ Workflow completed." ;;
+    
     *) echo "Usage: browse <command> [args]"; exit 1 ;;
 esac
